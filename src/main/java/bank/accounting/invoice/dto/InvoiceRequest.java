@@ -9,6 +9,12 @@ import bank.accounting.invoice.model.InvoiceLine;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Request payload for creating a new invoice.
+ *
+ * <p>Bean validation handles field-level checks before the service applies
+ * cross-field business rules such as due date ordering.</p>
+ */
 public record InvoiceRequest(
         @NotBlank String customerName,
         @NotNull LocalDate invoiceDate,

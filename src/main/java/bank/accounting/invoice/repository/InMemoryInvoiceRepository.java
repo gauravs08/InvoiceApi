@@ -11,6 +11,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Simple process-local invoice repository.
+ *
+ * <p>This implementation is useful for the coding exercise and local testing.
+ * It is not durable; all invoices are lost when the application stops.</p>
+ */
 @Repository
 public class InMemoryInvoiceRepository implements InvoiceRepository {
 

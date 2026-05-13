@@ -16,6 +16,13 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+/**
+ * Coordinates invoice business operations.
+ *
+ * <p>The service owns cross-field validation, invoice creation defaults,
+ * filtering rules, payment state transitions, and conversion from domain model
+ * to API response DTOs.</p>
+ */
 @Service
 public class InvoiceService {
 
@@ -28,6 +35,16 @@ public class InvoiceService {
         this.invoiceCalculator = invoiceCalculator;
     }
 
+    /**
+     * Creates a draft invoice from a validated request.
+     *
+     * <p>The invoice starts with no paid amount, the full final total as the
+     * remaining amount, and {@link InvoiceStatus#DRAFT} as its initial status.</p>
+     *
+     * @param request invoice creation request
+     * @return created invoice response
+     * @throws IllegalArgumentException when required request fields or date rules are invalid
+     */
     public InvoiceResponse createInvoice(InvoiceRequest request) {
         validateRequest(request);
 
@@ -47,6 +64,10 @@ public class InvoiceService {
         return toResponse(invoiceRepository.save(invoice));
     }
 
+    /**
+     * Applies business validation that cannot be fully expressed by field-level
+     * bean validation annotations.
+     */
     private void validateRequest(InvoiceRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("Invoice request is required");
@@ -65,12 +86,32 @@ public class InvoiceService {
         }
     }
 
+    /**
+     * Loads a single invoice by id.
+     *
+     * @param invoiceId invoice identifier
+     * @return matching invoice response
+     * @throws NoSuchElementException when the invoice does not exist
+     */
     public InvoiceResponse getInvoiceById(UUID invoiceId) {
         return invoiceRepository.findById(invoiceId)
                 .map(this::toResponse)
                 .orElseThrow(() -> new NoSuchElementException("Invoice not found: " + invoiceId));
     }
 
+    /**
+     * Searches invoices using optional filters.
+     *
+     * <p>Filters are combined with logical AND. Customer name matching is
+     * case-insensitive and partial; date bounds are inclusive.</p>
+     *
+     * @param status optional invoice status
+     * @param customerName optional partial customer name
+     * @param fromDate optional inclusive start date
+     * @param toDate optional inclusive end date
+     * @return matching invoice responses
+     * @throws IllegalArgumentException when {@code fromDate} is after {@code toDate}
+     */
     public List<InvoiceResponse> findInvoices(InvoiceStatus status,
                                               String customerName,
                                               LocalDate fromDate,
@@ -89,10 +130,22 @@ public class InvoiceService {
                         || !invoice.invoiceDate().isAfter(toDate))
                 .map(this::toResponse)
                 .toList();
-
-
     }
 
+    /**
+     * Registers a payment against an existing invoice.
+     *
+     * <p>The method rejects payments for already paid invoices and payments that
+     * would exceed the invoice's remaining balance. Valid payments are delegated
+     * to the domain model so status calculation stays in one place.</p>
+     *
+     * @param invoiceId invoice receiving the payment
+     * @param request payment request
+     * @return updated invoice response
+     * @throws NoSuchElementException when the invoice does not exist
+     * @throws IllegalArgumentException when the payment is invalid or too large
+     * @throws IllegalStateException when the invoice is already paid
+     */
     public InvoiceResponse registerPayment(UUID invoiceId, PaymentRequest request) {
         validatePaymentRequest(request);
 
@@ -111,6 +164,9 @@ public class InvoiceService {
         return toResponse(invoiceRepository.save(updatedInvoice));
     }
 
+    /**
+     * Converts the internal domain model to the API response shape.
+     */
     private InvoiceResponse toResponse(Invoice invoice) {
         return new InvoiceResponse(
                 invoice.invoiceId(),
@@ -126,6 +182,9 @@ public class InvoiceService {
         );
     }
 
+    /**
+     * Validates payment input before invoice state rules are evaluated.
+     */
     private void validatePaymentRequest(PaymentRequest request) {
         if (request == null) {
             throw new IllegalArgumentException("Payment request is required");

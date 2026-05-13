@@ -11,9 +11,16 @@ import java.time.LocalDateTime;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
+/**
+ * Maps expected application exceptions to stable JSON error responses.
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /**
+     * Converts bean validation failures into a readable {@code 400 Bad Request}
+     * message that names the invalid fields.
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidationException(MethodArgumentNotValidException exception) {
         String message = exception.getBindingResult()
@@ -25,21 +32,34 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, message);
     }
 
+    /**
+     * Handles business validation errors such as invalid date ranges or
+     * overpayment attempts.
+     */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiErrorResponse> handleBadRequest(IllegalArgumentException exception) {
         return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
+    /**
+     * Handles lookups for invoices that do not exist.
+     */
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<ApiErrorResponse> handleNotFound(NoSuchElementException exception) {
         return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage());
     }
 
+    /**
+     * Handles state conflicts, such as trying to pay an already paid invoice.
+     */
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiErrorResponse> handleConflict(IllegalStateException exception) {
         return buildResponse(HttpStatus.CONFLICT, exception.getMessage());
     }
 
+    /**
+     * Builds the common error response envelope used by all handlers.
+     */
     private ResponseEntity<ApiErrorResponse> buildResponse(HttpStatus status, String message) {
         return ResponseEntity.status(status)
                 .body(new ApiErrorResponse(
